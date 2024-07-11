@@ -51,11 +51,17 @@ reinstalling the package.
 Testing
 -------
 
-4. **Install testing requirements using pip:**
+1. **Install testing requirements using pip:**
 
    .. code-block:: bash
 
       pip install .[testing]
+
+2. **Test with coverage report**
+
+   .. code-block:: bash
+
+      pytest --cov=shilps
 
 Design considerations:
 ----------------------
