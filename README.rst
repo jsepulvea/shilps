@@ -11,14 +11,6 @@ components. This tool attempts to solve this problem by providing a flexible
 event--based simulation environment with standarized datasets. Moreover it
 provides a standard software interface for running physical simulations.
 
-Applications:
--------------
-
-1. Quasistationary controllers in active distribution networks.
-2. Local energy market design.
-3. Interdicion--based reinforcement of gas and electricity networks.
-4. Reinforcement learning: control and market participation.
-
 Installation
 ------------
 

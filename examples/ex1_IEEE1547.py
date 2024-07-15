@@ -3,39 +3,27 @@ This file implements a version of the ieee1547 proportional droop controller
 that is updated by a global control every hour in a dummy way. The objective is
 to show how the different interfaces between modules work.
 
-First, this file implements custom controller classes:
+I) this file implements custom controller classes:
     1) 1 global controller
     2) 1 local controller for each PV generator
 
-Second, a system is built by creating channels and binding ports.
+II) the system architecture is built by creating channels and binding ports.
 
-Third, the simulation is executed.
+III) the tasks are register with corresponding priorities
+
+IV) the simulation is run
+
 """
 import numpy as np
 import os
 import random
+from datetime import datetime, timedelta
 
 import shilps.powersystems as ps
+from shilps.shilps_logging import logging
 
 # **************************************************************************** #
-# Load DistributionNetwork module
-# **************************************************************************** #
-THIS_DIR = os.path.dirname(__file__)
-CASE_FOLDER = os.path.join(THIS_DIR, "data_seed/ieee4bus")
-CASE_NAME = "ieee4bus"
-
-config = {
-    "time_ini": 0,
-    "time_end": 10
-}
-
-shilps = ps.SimulationEnvironment(config)
-
-grid = ps.DistributionNetwork.read(CASE_FOLDER, CASE_NAME)
-shilps.add_module(grid)
-
-# **************************************************************************** #
-# The global update channel
+# Implement global-to-local channel
 # **************************************************************************** #
 class ChannelIEEE1547GlobalLocal(ps.Channel):
     N_PARAMS = 8
@@ -50,8 +38,7 @@ class ChannelIEEE1547GlobalLocal(ps.Channel):
 
 
 # **************************************************************************** #
-# The local controller
-# Implements the global controller that updates the local controllers
+# Implement the local controller
 # **************************************************************************** #
 class CtrlAdaIEEE1547(ps.Controller):
     def __init__(self):
@@ -71,13 +58,14 @@ class CtrlAdaIEEE1547(ps.Controller):
         self.port_voltage = ps.Port(ps.ChannelVoltageMeasurement, ps.IOMODE.READ)
         self.port_pq_actuation = ps.Port(ps.ChannelPQ, ps.IOMODE.WRITE)
 
-        # Register tasks
-        self.register_task(ps.EVENT.CLOCKTICK, ps.Task(self.run_tick, ps.PRIORITY_CTRL_LOCAL))
-
     def initialize(self):
-        pass
+        logging.debug("CtrlAdaIEEE1547 initialize called.")
+        # Define initial state
+        # TODO: It should be avoided to write to a READ port
+        self.port_voltage.write(0.)
 
     def actuate(self):
+        logging.debug(f"CtrlAdaIEEE1547 actuate called.")
         # Read observations
         bus_voltage = self.port_voltage.read()
 
@@ -92,7 +80,7 @@ class CtrlAdaIEEE1547(ps.Controller):
             reactive_power = self.q4
 
         # Actuate generator
-        self.port_generator.write(reactive_power)
+        self.port_pq_actuation.write(1000., reactive_power)
 
 
     def update(self):
@@ -102,9 +90,7 @@ class CtrlAdaIEEE1547(ps.Controller):
 
 
 # **************************************************************************** #
-# The global controller
-# ---------------------
-# Implements the global controller that updates the local controllers
+# Implement the global controller
 # **************************************************************************** #
 class GlobalController(ps.Controller):
     def __init__(self, l_dgs: list = None, grid: ps.DistributionNetwork = None):
@@ -115,8 +101,6 @@ class GlobalController(ps.Controller):
         assert(l_dgs is not None)
         self.l_dgs = l_dgs
         self.update_interval = ps.timedelta(hours=1)
-
-        self.register_task(ps.EVENT.CLOCKTICK, ps.Task(self.run_tick, ps.PRIORITY_CTRL_GLOBAL))
 
         # Controller ports
         self.ports_local_controllers = {
@@ -150,20 +134,31 @@ class GlobalController(ps.Controller):
             port.write(new_params)
 
     def update(self):
-        print("Update Global Controller")
-
-
+        logging.debug("GlobalController update called.")
 
 # **************************************************************************** #
-# Build the system by linking the modules (create links and bind ports)
+# Instantiate the simulation environment and the system
 # **************************************************************************** #
+shilps = ps.SimulationEnvironment()
 
+# Instantiate the distribution network module ieee4bus from files
+THIS_DIR = os.path.dirname(__file__)
+CASE_FOLDER = os.path.join(THIS_DIR, "data_seed/ieee4bus")
+CASE_NAME = "ieee4bus"
+grid = ps.DistributionNetwork.read(CASE_FOLDER, CASE_NAME)
+shilps.add_module(grid)
+
+# Instantiate the global controller
 global_controller = GlobalController(grid=grid)
 shilps.add_module(global_controller)
+
+# Instantiate the local controllers
+local_controllers = []
 for idx_dg, dg_actuation_port in grid.ports_pq_actuation.items():
     
     # Create local controller
     local_controller = CtrlAdaIEEE1547()
+    local_controllers.append(local_controller)
     shilps.add_module(local_controller)
 
     # Bind local controller
@@ -183,9 +178,32 @@ for idx_dg, dg_actuation_port in grid.ports_pq_actuation.items():
     local_controller.port_voltage.bind(channel_vmeasure)
     grid.ports_bus_voltage[bus_id].bind(channel_vmeasure)
 
+# **************************************************************************** #
+# Define tasks and priorities
+# **************************************************************************** #
+global_controller.register_task(
+    ps.EVENT.CLOCKTICK,
+    ps.Task(global_controller.run_tick, ps.PRIORITY_CTRL_GLOBAL)
+)
+
+for local_controller in local_controllers:
+    # Register tasks
+    local_controller.register_task(
+        ps.EVENT.INITIALIZE,
+        ps.Task(local_controller.initialize, ps.PRIORITY_CTRL_LOCAL)
+    )
+    
+    local_controller.register_task(
+        ps.EVENT.CLOCKTICK,
+        ps.Task(local_controller.run_tick, ps.PRIORITY_CTRL_LOCAL)
+    )
 
 # **************************************************************************** #
 # Config and run simulation
 # **************************************************************************** #
-# Set up the clock
-shilps.run()
+time_config = {
+    "time_ini": datetime(2018, 7, 27, 0, 0, 0),
+    "time_end": datetime(2018, 7, 27, 23, 59, 54),
+    "time_delta": timedelta(seconds=6)
+}
+shilps.run(time_config)
