@@ -33,6 +33,10 @@ This document focuses on getting any potential contributor familiarized
 with the development processes, but `other kinds of contributions`_ are also
 appreciated.
 
+The first step is to get familiarized with the
+:ref:`design concepts <design-notes>` underlying the shilps
+design.
+
 If you are new to using git_ or have never collaborated in a project previously,
 please have a look at `contribution-guide.org`_. Other resources are also
 listed in the excellent `guide created by FreeCodeCamp`_ [#contrib1]_.
@@ -42,6 +46,10 @@ considerate, reasonable, and respectful**. When in doubt, `Python Software
 Foundation's Code of Conduct`_ is a good reference in terms of behavior
 guidelines.
 
+
+Design Notes
+============
+.. include:: design_notes.rst
 
 Issue Reports
 =============

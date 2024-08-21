@@ -10,6 +10,7 @@
 import os
 import sys
 import shutil
+import re
 
 # -- Path setup --------------------------------------------------------------
 
@@ -98,8 +99,17 @@ copyright = "2024, Juan Sepúlveda, Alejandro Angulo, Nathalia Wolf"
 # release: The full version, including alpha/beta/rc tags.
 # If you don’t need the separation provided between version and release,
 # just set them both to the same value.
+def extract_version(version_string):
+    # Regular expression pattern to match "number.number.number"
+    pattern = r"(\d+\.\d+\.\d+)"
+    match = re.search(pattern, version_string)
+    if match:
+        return match.group(1)  # Returns the first match found
+    return None  # If no match is found, return None
+
 try:
     from shilps import __version__ as version
+    version = extract_version(version) 
 except ImportError:
     version = ""
 
@@ -153,7 +163,7 @@ todo_emit_warnings = True
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = "alabaster"
+html_theme = 'pydata_sphinx_theme'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the

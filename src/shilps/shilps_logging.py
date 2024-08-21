@@ -1,6 +1,5 @@
 import logging as loggg
 
-
 loggg.basicConfig(
     level=loggg.DEBUG,
     format='%(levelname)s:%(message)s'
