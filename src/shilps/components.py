@@ -9,11 +9,8 @@ import glob
 ISO8601 = "%Y-%m-%dT%H:%M:%S%z"
 
 
-@dataclass(slots=True)
-class Component:
-    index: int = None
-    name: str = None
-
+@dataclass
+class SerializableDataClass:
     def to_dict(self) -> Dict[str, Any]:
         """Convert the component's data to a dictionary for easy DataFrame
         insertion.
@@ -56,6 +53,11 @@ class Component:
 
         return self.__class__(**kwargs)
 
+
+@dataclass(slots=True)
+class Component(SerializableDataClass):
+    index: int = None
+    name: str = None
 
 class TimeConfig:
     def __init__(self, start=None, end=None, periods=None, freq=None, tz=None):
@@ -475,7 +477,7 @@ class PVGenerator(Component):
     bus: int = None
     snom_MVA: float = None
     pfmin: float = None
-    pmax_pu: TSParameter = None
+    pmax_MW: TSParameter = None
 
 @dataclass(slots=True)
 class PVSdmml(Component):
@@ -665,6 +667,12 @@ class Entity:
             ).items():
                 yield component
 
+    def set_time_series(self, data: DataScenarioTime):
+        for component in self.components_iterator():
+            for param_name, param in component.__dict__.items():
+                if isinstance(param, TSParameter):
+                    param.set_tsdata(data)
+
 
 class DataPowerSystem(Entity):
 
@@ -709,11 +717,7 @@ class DataPowerSystem(Entity):
             inv_generators if inv_generators is not None else {}
         )
 
-    def set_time_series(self, data: DataScenarioTime):
-        for component in self.components_iterator():
-            for param_name, param in component.__dict__.items():
-                if isinstance(param, TSParameter):
-                    param.set_tsdata(data)
+
 
 
 
