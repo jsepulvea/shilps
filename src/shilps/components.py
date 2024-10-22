@@ -100,6 +100,107 @@ class TimeConfig:
         return cls(**data)
 
 
+@dataclass(slots=True)
+class PlanningTimeConfig(SerializableDataClass):
+    """
+    Configuration class for defining time-related parameters in a planning
+    horizon for a scenario-based optimization problem.
+
+    Parameters
+    ----------
+    start : str or pandas.Timestamp
+        The start date of the planning horizon. If a string is provided, it will
+        be converted to a `pandas.Timestamp`.
+    end : str or pandas.Timestamp
+        The end date of the planning horizon. If a string is provided, it will
+        be converted to a `pandas.Timestamp`.
+    scenarios_per_year : int
+        Number of representative scenarios to generate per year.
+    scenario_resolution : str
+        Temporal resolution of each scenario. For example, '1D' represents daily
+        scenarios, '1W' represents weekly scenarios, etc.
+    scenario_subsampling : str
+        Subsampling frequency used for dynamic modeling purposes, such as
+        battery simulation within the defined scenario. For example, '1h' for
+        hourly subsampling.
+
+    Raises
+    ------
+    ValueError
+        If `end` is earlier than or equal to
+        `start`.
+
+    Examples
+    --------
+    Create a time configuration for a planning horizon from 2025 to 2065 with
+    daily scenarios and hourly subsampling:
+
+    ```python
+    time_config = TimeConfig(
+        start='2025-01-01',
+        end='2065-12-31',
+        scenarios_per_year=12,
+        scenario_resolution='1D',
+        scenario_subsampling='1h'
+    )
+    ```
+    """
+    start: pd.Timestamp  
+    end: pd.Timestamp    
+    scenarios_per_year: int               
+    scenario_resolution: str              
+    scenario_subsampling: str             
+
+    def __post_init__(self):
+        # Ensure that start and end are valid
+        # pandas Timestamps
+        if isinstance(self.start, str):
+            self.start = pd.Timestamp(self.start)
+        if isinstance(self.end, str):
+            self.end = pd.Timestamp(self.end)
+
+        # Validate that the planning horizon end is after the start
+        if self.end <= self.start:
+            raise ValueError("end must be after start.")
+
+    @property
+    def range(self) -> pd.DatetimeIndex:
+        """
+        Returns the range of dates from start to
+        end at the resolution specified by scenario_resolution.
+
+        Returns
+        -------
+        pd.DatetimeIndex
+            A range of dates between `start` and
+            `end` using the frequency defined in
+            `scenario_resolution`.
+
+        Examples
+        --------
+        >>> time_config = TimeConfig(
+        ...     start='2025-01-01',
+        ...     end='2025-12-31',
+        ...     scenarios_per_year=12,
+        ...     scenario_resolution='1D',
+        ...     scenario_subsampling='1h'
+        ... )
+        >>> time_config.range
+        DatetimeIndex(['2025-01-01', '2025-01-02', ..., '2025-12-31'], dtype='datetime64[ns]', freq='D')
+        """
+        return pd.date_range(start=self.start, 
+                             end=self.end, 
+                             freq=self.scenario_resolution)
+
+    @property
+    def scenario_duration(self) -> pd.Timedelta:
+        return pd.Timedelta(self.scenario_resolution)
+    
+    @property
+    def planning_horizon_duration(self) -> pd.Timedelta:
+        return self.end - self.start
+
+
 class DataScenarioTime:
     def __init__(self, df: pd.DataFrame = None, time_config: TimeConfig = None):
 
@@ -174,19 +275,23 @@ class DataScenarioTime:
 
 class DataTimeSeries:
     def __init__(self, dict_df: Dict[Any, pd.DataFrame] = None, tsnames: str = None,
-                 time_config:TimeConfig = None, scenarios: List[int] = None):
+                 time_config:TimeConfig = None, scenarios: list = None,
+                 time_ranges: dict = None):
         
         self.tsnames = tsnames
         self.dict_df = dict_df if dict_df is not None else {}
-        self.time_config = time_config
-        
-        if tsnames is not None and scenarios is not None:
+
+        if time_config is not None and tsnames is not None and scenarios is not None:
             for scenario in scenarios:
                 self.dict_df[scenario] = self._create_empty_df(tsnames, time_config)
         
+        if time_ranges is not None:
+            for key, time_range in time_ranges.items():
+                self.dict_df[key] = self._create_empty_df(tsnames, time_range)
+        
     @staticmethod
-    def _create_empty_df(tsnames, time_config):
-        return pd.DataFrame(index=time_config.range, columns=tsnames)
+    def _create_empty_df(tsnames, time_range):
+        return pd.DataFrame(index=time_range, columns=tsnames)
     
     def get_value(self, tsname, *args):
         scenario = args[0]
@@ -249,6 +354,9 @@ class DataTimeSeries:
         dict_key = tuple(args[:-1])
         tsname = args[-1]
         self.dict_df[dict_key].loc[:, tsname] = value
+
+    def keys(self):
+        return self.dict_df.keys()
 
     def __getitem__(self, key):
         return self.dict_df[key]
