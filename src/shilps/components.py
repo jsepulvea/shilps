@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 import pandas as pd
-from typing import Dict, Any, Type, List
+from typing import Dict, Any, Type, List, Tuple
 import json
 import numpy as np
 import os
