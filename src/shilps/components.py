@@ -104,14 +104,14 @@ class TimeConfig:
 class PlanningTimeConfig(SerializableDataClass):
     """
     Configuration class for defining time-related parameters in a planning
-    horizon for a scenario-based optimization problem.
+    horizon.
 
     Parameters
     ----------
-    start : str or pandas.Timestamp
+    planning_horizon_start : str or pandas.Timestamp
         The start date of the planning horizon. If a string is provided, it will
         be converted to a `pandas.Timestamp`.
-    end : str or pandas.Timestamp
+    planning_horizon_end : str or pandas.Timestamp
         The end date of the planning horizon. If a string is provided, it will
         be converted to a `pandas.Timestamp`.
     scenarios_per_year : int
@@ -127,8 +127,8 @@ class PlanningTimeConfig(SerializableDataClass):
     Raises
     ------
     ValueError
-        If `end` is earlier than or equal to
-        `start`.
+        If `planning_horizon_end` is earlier than or equal to
+        `planning_horizon_start`.
 
     Examples
     --------
@@ -137,50 +137,50 @@ class PlanningTimeConfig(SerializableDataClass):
 
     ```python
     time_config = TimeConfig(
-        start='2025-01-01',
-        end='2065-12-31',
+        planning_horizon_start='2025-01-01',
+        planning_horizon_end='2065-12-31',
         scenarios_per_year=12,
         scenario_resolution='1D',
         scenario_subsampling='1h'
     )
     ```
     """
-    start: pd.Timestamp  
-    end: pd.Timestamp    
+    planning_horizon_start: pd.Timestamp  
+    planning_horizon_end: pd.Timestamp    
     scenarios_per_year: int               
     scenario_resolution: str              
     scenario_subsampling: str             
 
     def __post_init__(self):
-        # Ensure that start and end are valid
+        # Ensure that planning_horizon_start and planning_horizon_end are valid
         # pandas Timestamps
-        if isinstance(self.start, str):
-            self.start = pd.Timestamp(self.start)
-        if isinstance(self.end, str):
-            self.end = pd.Timestamp(self.end)
+        if isinstance(self.planning_horizon_start, str):
+            self.planning_horizon_start = pd.Timestamp(self.planning_horizon_start)
+        if isinstance(self.planning_horizon_end, str):
+            self.planning_horizon_end = pd.Timestamp(self.planning_horizon_end)
 
         # Validate that the planning horizon end is after the start
-        if self.end <= self.start:
-            raise ValueError("end must be after start.")
+        if self.planning_horizon_end <= self.planning_horizon_start:
+            raise ValueError("planning_horizon_end must be after planning_horizon_start.")
 
     @property
     def range(self) -> pd.DatetimeIndex:
         """
-        Returns the range of dates from start to
-        end at the resolution specified by scenario_resolution.
+        Returns the range of dates from planning_horizon_start to
+        planning_horizon_end at the resolution specified by scenario_resolution.
 
         Returns
         -------
         pd.DatetimeIndex
-            A range of dates between `start` and
-            `end` using the frequency defined in
+            A range of dates between `planning_horizon_start` and
+            `planning_horizon_end` using the frequency defined in
             `scenario_resolution`.
 
         Examples
         --------
         >>> time_config = TimeConfig(
-        ...     start='2025-01-01',
-        ...     end='2025-12-31',
+        ...     planning_horizon_start='2025-01-01',
+        ...     planning_horizon_end='2025-12-31',
         ...     scenarios_per_year=12,
         ...     scenario_resolution='1D',
         ...     scenario_subsampling='1h'
@@ -188,8 +188,8 @@ class PlanningTimeConfig(SerializableDataClass):
         >>> time_config.range
         DatetimeIndex(['2025-01-01', '2025-01-02', ..., '2025-12-31'], dtype='datetime64[ns]', freq='D')
         """
-        return pd.date_range(start=self.start, 
-                             end=self.end, 
+        return pd.date_range(start=self.planning_horizon_start, 
+                             end=self.planning_horizon_end, 
                              freq=self.scenario_resolution)
 
     @property
@@ -198,8 +198,59 @@ class PlanningTimeConfig(SerializableDataClass):
     
     @property
     def planning_horizon_duration(self) -> pd.Timedelta:
-        return self.end - self.start
+        return self.planning_horizon_end - self.planning_horizon_start
 
+def generate_scenario_time_ranges(time_config: PlanningTimeConfig) -> Dict[Tuple[int, int], pd.DatetimeIndex]:
+    """
+    Generate a set of time ranges indexed by a tuple (year, scenario), where
+    each time range corresponds to a randomly selected time period within
+    the year, using the scenario resolution and scenario subsampling
+    frequency from the TimeConfig.
+
+    Parameters
+    ----------
+    time_config : TimeConfig
+        The configuration that defines the planning horizon, scenario
+        resolution, and subsampling frequency.
+
+    Returns
+    -------
+    Dict[Tuple[int, int], pd.DatetimeIndex]
+        A dictionary where the keys are tuples (year, scenario), and the
+        values are the corresponding time ranges with subsampling frequency.
+    """
+    time_ranges = {}
+    # Raise error if the planning horizon does not end in 12-31
+    if (time_config.planning_horizon_end.month != 12
+        or time_config.planning_horizon_end.day != 31):
+        raise ValueError("The planning horizon must end on December 31st.")
+
+    # Get the list of years in the planning horizon
+    years = pd.date_range(time_config.planning_horizon_start, 
+                          time_config.planning_horizon_end, 
+                          freq='YE').year
+
+    # Loop over each year
+    for year in years:
+        # Generate scenarios for this year
+        for scenario in range(time_config.scenarios_per_year):
+            # Define the start and end dates for this year
+            year_start = pd.Timestamp(f"{year}-01-01")
+            year_end = pd.Timestamp(f"{year}-12-31")
+
+            # Randomly select a start date within the year for the scenario
+            random_start = pd.Timestamp(np.random.choice(pd.date_range(year_start, year_end, freq='D')))
+            
+            # Generate a time range with the scenario_resolution and scenario_subsampling
+            time_range = pd.date_range(start=random_start, 
+                                       end=random_start + pd.Timedelta(time_config.scenario_resolution),
+                                       inclusive="left",
+                                       freq=time_config.scenario_subsampling)
+
+            # Store the time range in the dictionary with (year, scenario) as the key
+            time_ranges[(year, scenario)] = time_range
+
+    return time_ranges
 
 class DataScenarioTime:
     def __init__(self, df: pd.DataFrame = None, time_config: TimeConfig = None):
