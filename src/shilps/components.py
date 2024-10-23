@@ -200,7 +200,7 @@ class PlanningTimeConfig(SerializableDataClass):
     def planning_horizon_duration(self) -> pd.Timedelta:
         return self.planning_horizon_end - self.planning_horizon_start
 
-def generate_scenario_time_ranges(time_config: PlanningTimeConfig) -> Dict[Tuple[int, int], pd.DatetimeIndex]:
+def scenario_time_ranges(time_config: PlanningTimeConfig) -> Dict[Tuple[int, int], pd.DatetimeIndex]:
     """
     Generate a set of time ranges indexed by a tuple (year, scenario), where
     each time range corresponds to a randomly selected time period within
@@ -879,12 +879,6 @@ class DataPowerSystem(Entity):
 
 
 
-
-
-
-
-
-
 def case_ieee4bus():
     """CASE4_DIST Power flow data for 4 bus radial distribution system.
 
@@ -917,8 +911,8 @@ def case_ieee4bus():
 
     for i in range(3):
         kwargs = {k: v for k, v in zip(demand_names, demand_vals[i])}
-        kwargs["p_MW"] = TSParameter(f"p_MW{i}", kwargs["pnom_MW"])
-        kwargs["q_MVAr"] = TSParameter(f"q_MVAr{i}", kwargs["qnom_MVAr"])
+        kwargs["p_MW"] = TSParameter(f"loadp_MW{i}", kwargs["load_pnom_MW"])
+        kwargs["q_MVAr"] = TSParameter(f"loadq_MVAr{i}", kwargs["load_qnom_MVAr"])
         data.add(Demand(**kwargs))
 
     for i in range(3):
