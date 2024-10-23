@@ -6,9 +6,6 @@ from shilps.legacy_errors import InputError
 from shilps.legacy_global_definitions import *
 from shilps.legacy_jpyaml import yaml
 from datetime import datetime, timedelta
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-mpl.rcParams.update(mpl.rcParamsDefault)
 
 class Adn(object):
     def __init__(self):
@@ -307,18 +304,6 @@ class Adn(object):
             self.__graph.add_edges_from(list(zip(df_trafos['busf'].to_list(), df_trafos['bust'].to_list())), color='r', label = "T")
 
         return self.__graph
-
-    @property
-    def show_graph(self):
-        assert self.graph is not None
-        pos         = nx.spring_layout(self.graph)
-        node_color  = ['skyblue']+['lightgreen']*(len(pos)-1)
-        edge_labels = {k:self.graph.get_edge_data(k[0], k[1])['label']+'$_{%d\u2192%d}$'%(k[0], k[1]) for k in self.graph.edges}
-        edge_color  = nx.get_edge_attributes(self.graph, "color").values()
-        plt.figure(1)
-        nx.draw_networkx(self.graph, pos, with_labels=True, node_color=node_color, edge_color=edge_color)
-        nx.draw_networkx_edge_labels(self.graph,pos,edge_labels=edge_labels)
-        plt.show()
 
     def grid_pointer(self):
         ret = Adn()
