@@ -911,8 +911,8 @@ def case_ieee4bus():
 
     for i in range(3):
         kwargs = {k: v for k, v in zip(demand_names, demand_vals[i])}
-        kwargs["p_MW"] = TSParameter(None, kwargs["load_pnom_MW"])
-        kwargs["q_MVAr"] = TSParameter(None, kwargs["load_qnom_MVAr"])
+        kwargs["p_MW"] = TSParameter(default=kwargs["pnom_MW"])
+        kwargs["q_MVAr"] = TSParameter(default=kwargs["qnom_MVAr"])
         data.add(Demand(**kwargs))
 
     for i in range(3):
