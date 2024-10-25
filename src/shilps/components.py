@@ -8,7 +8,6 @@ import glob
 
 ISO8601 = "%Y-%m-%dT%H:%M:%S%z"
 
-
 @dataclass
 class SerializableDataClass:
     def to_dict(self) -> Dict[str, Any]:
